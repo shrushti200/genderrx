@@ -80,25 +80,6 @@ Every prescription receives a **Bias Risk Score from 0 to 10**. Alerts are grade
 - **Brand-name resolution** — type `Dolo 650`, `Azithral`, `Combiflam`, `Crocin`… common brands map to their generic entries automatically
 - **Safer alternatives** — every high-bias finding suggests a lower-risk option for female patients
 
----
-
-###  Dashboard — live audit statistics & risk trends
-![Dashboard](screenshots/01-dashboard.png)
-
-###  Prescription Analyzer — HIGH BIAS RISK (9.0) detected
-![Analyzer — high bias risk](screenshots/02-analyzer-high-risk.png)
-
-###  Risk factors, allergies & safer alternatives
-![Risk factors and allergies](screenshots/04-risk-and-allergies.png)
-
-###  Drug Bias Database — sex-specific dosing at a glance
-![Drug database](screenshots/03-drug-database.png)
-
-###  Hormonal Cycle Adjuster — pregnancy-aware dosage adjustment
-![Hormonal adjuster](screenshots/05-hormonal-adjuster.png)
-
----
-
 ##  Getting Started
 
 No build step, no install, no dependencies.
