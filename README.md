@@ -16,7 +16,6 @@
 - [The Problem](#-the-problem)
 - [How It Works](#-how-it-works)
 - [Features](#-features)
-- [Screenshots](#-screenshots)
 - [Getting Started](#-getting-started)
 - [Tech Stack](#-tech-stack)
 - [Data Sources & References](#-data-sources--references)
