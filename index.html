@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenderRx — Clinical Bias Auditor</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--pri:#2563eb;--pri-dk:#1d4ed8;--pri-lt:#dbeafe;--dng:#dc2626;--dng-lt:#fef2f2;--wrn:#f59e0b;--wrn-lt:#fffbeb;--suc:#16a34a;--suc-lt:#f0fdf4;--bg:#f1f5f9;--sb:#0f172a;--card:#fff;--txt:#0f172a;--muted:#64748b;--bdr:#e2e8f0;--radius:14px}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--txt);display:flex;min-height:100vh}
+
+/* ===== SIDEBAR ===== */
+.sidebar{width:240px;background:linear-gradient(180deg,#0f172a 0%,#1e293b 100%);color:#fff;position:fixed;height:100vh;overflow-y:auto;z-index:100;display:flex;flex-direction:column;flex-shrink:0}
+.sb-head{padding:28px 24px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+.sb-head h1{font-size:20px;font-weight:800;letter-spacing:-.5px;display:flex;align-items:center;gap:10px}
+.sb-head h1 span{font-size:22px}
+.sb-head p{font-size:11px;color:rgba(255,255,255,.4);margin-top:6px;letter-spacing:.5px}
+.sb-nav{flex:1;padding:16px 0}
+.sb-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.25);padding:16px 24px 8px}
+.sb-item{display:flex;align-items:center;gap:12px;padding:11px 24px;cursor:pointer;transition:all .15s;font-size:13.5px;color:rgba(255,255,255,.5);font-weight:500;border-left:3px solid transparent}
+.sb-item:hover{background:rgba(255,255,255,.04);color:rgba(255,255,255,.85)}
+.sb-item.active{background:rgba(37,99,235,.15);color:#60a5fa;border-left-color:#60a5fa}
+.sb-item i{width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;line-height:1}
+.sb-foot{padding:16px 24px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(255,255,255,.3)}
+.dot{width:7px;height:7px;background:#22c55e;border-radius:50%;display:inline-block;margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ===== MAIN ===== */
+.main{margin-left:260px;flex:1;padding:32px 40px;min-height:100vh}
+.page{display:none;animation:fadeIn .3s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.pg-hdr{margin-bottom:28px;display:flex;justify-content:space-between;align-items:flex-end}
+.pg-hdr h2{font-size:26px;font-weight:800;letter-spacing:-.5px}
+.pg-hdr p{color:var(--muted);font-size:13px;margin-top:4px}
+
+/* ===== CARDS ===== */
+.card{background:var(--card);border-radius:var(--radius);padding:24px;border:1px solid var(--bdr);box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.card h3{font-size:15px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+
+/* ===== STATS ===== */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.stat{background:var(--card);border-radius:var(--radius);padding:20px 24px;border:1px solid var(--bdr);position:relative;overflow:hidden}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat.blue::before{background:var(--pri)}
+.stat.red::before{background:var(--dng)}
+.stat.green::before{background:var(--suc)}
+.stat.amber::before{background:var(--wrn)}
+.stat .lbl{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.stat .val{font-size:30px;font-weight:800;margin-top:8px;line-height:1}
+.stat.blue .val{color:var(--pri)}
+.stat.red .val{color:var(--dng)}
+.stat.green .val{color:var(--suc)}
+.stat.amber .val{color:var(--wrn)}
+.stat .sub{font-size:11px;color:var(--muted);margin-top:6px}
+
+/* ===== CHARTS (CSS only) ===== */
+.chart-bar{display:flex;align-items:end;gap:8px;height:120px;padding-top:8px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar{width:100%;border-radius:6px 6px 0 0;transition:height .6s ease;min-height:4px}
+.bar-lbl{font-size:10px;color:var(--muted);font-weight:600}
+.pie-wrap{display:flex;align-items:center;gap:24px}
+.pie{width:120px;height:120px;border-radius:50%;position:relative}
+.pie-legend{display:flex;flex-direction:column;gap:8px}
+.pie-legend-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.pie-legend-item span{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+
+/* ===== FORMS ===== */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg.full{grid-column:1/-1}
+.fg label{font-size:12px;font-weight:600;color:var(--muted)}
+.fg input,.fg select{padding:10px 14px;border:1.5px solid var(--bdr);border-radius:10px;font-size:13.5px;font-family:inherit;transition:all .2s;background:#fff}
+.fg input:focus,.fg select:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-lt)}
+
+/* ===== BUTTONS ===== */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .2s;font-family:inherit}
+.btn-pri{background:var(--pri);color:#fff}
+.btn-pri:hover{background:var(--pri-dk);transform:translateY(-1px);box-shadow:0 4px 14px rgba(37,99,235,.3)}
+.btn-sec{background:transparent;border:1.5px solid var(--bdr);color:var(--txt)}
+
+/* ===== RISK ===== */
+.risk-box{display:flex;align-items:center;gap:24px;padding:20px}
+.risk-num{font-size:52px;font-weight:800;min-width:90px;text-align:center;line-height:1}
+
+/* ===== BIAS CARDS ===== */
+.bias-card{background:var(--card);border-radius:12px;padding:18px 20px;margin-bottom:12px;border:1px solid var(--bdr);border-left:4px solid var(--dng);transition:transform .15s}
+.bias-card:hover{transform:translateX(2px)}
+.bias-card.warn{border-left-color:var(--wrn)}
+.bias-card.info{border-left-color:var(--pri)}
+.bias-card.ok{border-left-color:var(--suc)}
+.bias-card h4{font-size:14px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.bias-card p{font-size:12.5px;color:var(--muted);line-height:1.6}
+.bias-card .cite{margin-top:8px;padding:6px 10px;background:#f8fafc;border-radius:6px;font-size:11px;color:var(--muted)}
+
+/* ===== ALLERGY ===== */
+.alg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.alg-cat{display:flex;flex-direction:column;gap:5px}
+.alg-hdr{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:2px}
+.alg-chip{display:flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid var(--bdr);border-radius:8px;font-size:12px;cursor:pointer;transition:all .15s;background:#fff}
+.alg-chip:hover{border-color:#f87171;background:#fef2f2}
+.alg-chip.sel{border-color:var(--dng);background:#fef2f2;color:var(--dng);font-weight:600}
+.alg-chip input{accent-color:var(--dng)}
+
+/* ===== DRUG DB ===== */
+.drg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.drg-card{background:var(--card);border-radius:12px;padding:18px;border:1px solid var(--bdr);cursor:pointer;transition:all .2s}
+.drg-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.06)}
+.drg-card h4{font-size:15px;font-weight:700;margin-bottom:2px}
+.drg-card .cls{font-size:11px;color:var(--muted);margin-bottom:8px}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-h{background:#fef2f2;color:#dc2626}
+.badge-m{background:#fffbeb;color:#d97706}
+.badge-l{background:#f0fdf4;color:#16a34a}
+
+/* ===== HORMONAL ===== */
+.h-opt{display:flex;align-items:center;gap:10px;padding:12px;border:1.5px solid var(--bdr);border-radius:10px;cursor:pointer;transition:all .15s}
+.h-opt:hover{border-color:var(--pri);background:var(--pri-lt)}
+.h-opt input{accent-color:var(--pri)}
+.h-opt .hl{font-weight:600;font-size:13px}
+.h-opt .hd{font-size:11px;color:var(--muted)}
+.adj-result{background:linear-gradient(135deg,var(--pri-lt),#ede9fe);border:2px solid var(--pri);border-radius:14px;padding:22px;margin-top:18px}
+.adj-result h4{font-size:16px;font-weight:700;color:var(--pri-dk);margin-bottom:6px}
+.adj-result p{font-size:13px;line-height:1.6}
+
+/* ===== AUDIT TABLE ===== */
+.a-tbl{width:100%;border-collapse:collapse}
+.a-tbl th,.a-tbl td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--bdr);font-size:12px}
+.a-tbl th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.a-tbl tr:hover{background:#f8fafc}
+.r-badge{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700}
+.r-h{background:#fef2f2;color:#dc2626}
+.r-m{background:#fffbeb;color:#d97706}
+.r-l{background:#f0fdf4;color:#16a34a}
+
+/* ===== TOAST ===== */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--sb);color:#fff;padding:14px 22px;border-radius:12px;font-size:13px;z-index:1000;transform:translateY(100px);opacity:0;transition:all .3s}
+.toast.show{transform:translateY(0);opacity:1}
+
+/* ===== MODAL ===== */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:18px;padding:32px;max-width:560px;width:92%;max-height:80vh;overflow-y:auto;position:relative}
+.modal-x{position:absolute;top:14px;right:14px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)}
+
+/* ===== LOADING ===== */
+.spinner-wrap{display:none;text-align:center;padding:40px}
+.spinner-wrap.on{display:block}
+.spinner{width:36px;height:36px;border:3px solid var(--bdr);border-top-color:var(--pri);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:1024px){.stats{grid-template-columns:repeat(2,1fr)}.alg-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.sidebar{width:56px}.sidebar .sb-head p,.sidebar .sb-label,.sidebar .sb-item span,.sidebar .sb-foot span{display:none}.sb-head h1{font-size:14px;justify-content:center}.sb-head h1 span{font-size:16px}.sb-item{justify-content:center;padding:10px 0}.sb-item i{font-size:16px}.main{margin-left:56px;padding:16px}}
+
+.risk-alert{padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:13px;border-left:4px solid}
+.risk-alert.warning{background:#fef3cd;border-color:#ffc107;color:#856404}
+.risk-alert.danger{background:#f8d7da;border-color:#dc3545;color:#721c24}
+
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sb-head">
+    <h1><span style="font-size:18px">⚕️</span> GenderRx</h1>
+    <p>CLINICAL BIAS AUDITOR</p>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-label">Main</div>
+    <div class="sb-item active" onclick="go('dash',this)"><i>📊</i><span>Dashboard</span></div>
+    <div class="sb-item" onclick="go('rx',this)"><i>📋</i><span>Prescription Analyzer</span></div>
+    <div class="sb-item" onclick="go('horm',this)"><i>🧬</i><span>Hormonal Adjuster</span></div>
+    <div class="sb-label">Data</div>
+    <div class="sb-item" onclick="go('db',this)"><i>💊</i><span>Drug Database</span></div>
+    <div class="sb-item" onclick="go('log',this)"><i>📝</i><span>Audit Log</span></div>
+  </nav>
+  <div class="sb-foot"><span class="dot"></span>System Online</div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+
+<!-- ===== DASHBOARD ===== -->
+<div id="p-dash" class="page active">
+  <div class="pg-hdr"><div><h2>Dashboard</h2><p>Real-time overview of clinical bias detection</p></div></div>
+  <div class="stats">
+    <div class="stat blue"><div class="lbl">Total Audited</div><div class="val" id="s-total">0</div><div class="sub">Prescriptions analyzed</div></div>
+    <div class="stat red"><div class="lbl">Bias Flagged</div><div class="val" id="s-flag">0</div><div class="sub">Required adjustment</div></div>
+    <div class="stat green"><div class="lbl">Safe Prescriptions</div><div class="val" id="s-safe">0</div><div class="sub">No bias detected</div></div>
+    <div class="stat amber"><div class="lbl">Avg Risk Score</div><div class="val" id="s-risk">—</div><div class="sub">Across all audits</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="card">
+      <h3>📈 Bias Trend (Last 10 Audits)</h3>
+      <div class="chart-bar" id="chart-bars"></div>
+    </div>
+    <div class="card">
+      <h3>🎯 Risk Distribution</h3>
+      <div class="pie-wrap">
+        <div class="pie" id="pie-chart"></div>
+        <div class="pie-legend">
+          <div class="pie-legend-item"><span style="background:var(--dng)"></span>High Risk</div>
+          <div class="pie-legend-item"><span style="background:var(--wrn)"></span>Moderate Risk</div>
+          <div class="pie-legend-item"><span style="background:var(--suc)"></span>Low Risk</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px">
+    <div class="card"><h3>🕐 Recent Audits</h3><div id="recent-list"><p style="color:var(--muted);font-size:13px">No audits yet. Go to Prescription Analyzer.</p></div></div>
+    <div class="card"><h3>⚠️ Top Bias Alerts</h3>
+      <div style="font-size:12px;line-height:2.2">
+        <div>🔴 <strong>Zolpidem</strong> — FDA: 5mg ♀ vs 10mg ♂</div>
+        <div>🔴 <strong>Digoxin</strong> — 36% lower renal clearance in women</div>
+        <div>🟡 <strong>Codeine</strong> — CYP2D6 ultra-rapid risk in women</div>
+        <div>🟡 <strong>Warfarin</strong> — 30% lower dose needed for women</div>
+        <div>🟡 <strong>Diazepam</strong> — 40% longer sedation in women</div>
+        <div>🟡 <strong>Morphine</strong> — Metabolite accumulation in women</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PRESCRIPTION ANALYZER ===== -->
+<div id="p-rx" class="page">
+  <div class="pg-hdr"><div><h2>Prescription Bias Analyzer</h2><p>Cross-reference prescriptions against gender-biased medical literature</p></div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div class="card">
+      <h3>📋 Prescription Details</h3>
+      <div class="form-grid">
+        <div class="fg full"><label>Drug Name</label><input id="i-drug" placeholder="e.g. Dolo 650, Azithromycin, Warfarin..."></div>
+        <div class="fg"><label>Dosage (mg)</label><input type="number" id="i-dose" placeholder="10"></div>
+        <div class="fg"><label>Route</label><select id="i-route"><option>Oral</option><option>Intravenous</option><option>Intramuscular</option><option>Topical</option></select></div>
+        <div class="fg"><label>Frequency</label><select id="i-freq"><option>Once daily</option><option>Twice daily</option><option>Three times daily</option><option>PRN</option></select></div>
+        <div class="fg full"><label>Condition / Indication</label><select id="i-condition"><option value="">-- Select condition --</option><option value="flu">Flu / Influenza (Viral)</option><option value="cold">Common Cold (Viral)</option><option value="covid">COVID-19 (Viral)</option><option value="bronchitis">Acute Bronchitis (Usually Viral)</option><option value="pharyngitis">Sore Throat / Pharyngitis</option><option value="sinusitis">Sinusitis</option><option value="pneumonia">Pneumonia</option><option value="uti">Urinary Tract Infection</option><option value="sti">Sexually Transmitted Infection</option><option value="skin">Skin / Soft Tissue Infection</option><option value="dental">Dental Infection</option><option value="ear">Ear Infection (Otitis Media)</option><option value="eye">Eye Infection (Conjunctivitis)</option><option value="gi">Gastrointestinal Infection</option><option value="other">Other Bacterial Infection</option></select></div>
+        <div class="fg"><label>Patient Sex</label><select id="i-sex"><option value="female">Female</option><option value="male">Male</option></select></div>
+        <div class="fg"><label>Age</label><input type="number" id="i-age" placeholder="35"></div>
+        <div class="fg"><label>Weight (kg)</label><input type="number" id="i-wt" placeholder="65"></div>
+        <div class="fg"><label>Renal Function</label><select id="i-renal"><option value="normal">Normal (eGFR >90)</option><option value="mild">Mild (60-89)</option><option value="moderate">Moderate (30-59)</option><option value="severe">Severe (<30)</option></select></div>
+      </div>
+      <div style="margin-top:18px;padding-top:18px;border-top:1px solid var(--bdr)">
+        <div style="margin-top:18px;padding-top:18px;border-top:1px solid var(--bdr)">
+        <h3>⚠️ Patient Risk Factors</h3>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Select all that apply — system will cross-reference with prescribed drug.</p>
+        <div class="alg-grid" style="grid-template-columns:repeat(2,1fr)">
+          <label class="alg-chip"><input type="checkbox" value="lowPotassium" class="risk-factor"> ⚗️ Low Potassium</label>
+          <label class="alg-chip"><input type="checkbox" value="lowMagnesium" class="risk-factor"> 🧪 Low Magnesium</label>
+          <label class="alg-chip"><input type="checkbox" value="liverDisease" class="risk-factor"> 🫁 Liver Disease</label>
+          <label class="alg-chip"><input type="checkbox" value="kidneyDisease" class="risk-factor"> 🫘 Kidney Disease</label>
+          <label class="alg-chip"><input type="checkbox" value="heartCondition" class="risk-factor"> ❤️ Heart Disease</label>
+          <label class="alg-chip"><input type="checkbox" value="elderly" class="risk-factor"> 👴 Elderly (>65)</label>
+          <label class="alg-chip"><input type="checkbox" value="obese" class="risk-factor"> ⚖️ Obese (BMI>30)</label>
+          <label class="alg-chip"><input type="checkbox" value="prediabetic" class="risk-factor"> 🩸 Pre-Diabetes</label>
+          <label class="alg-chip"><input type="checkbox" value="diabetic" class="risk-factor"> 💉 Diabetes</label>
+          <label class="alg-chip"><input type="checkbox" value="pastHSP" class="risk-factor"> 🔴 History of HSP (Past)</label>
+          <label class="alg-chip"><input type="checkbox" value="purpura" class="risk-factor"> 🩹 Active Purpura/HSP</label>
+          <label class="alg-chip"><input type="checkbox" value="asthmatic" class="risk-factor"> 🫁 Asthma/COPD</label>
+        </div>
+      </div>
+
+      <h3>🚨 Patient Allergies</h3>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Select all known allergies for direct match & cross-reactivity checks.</p>
+        <div class="alg-grid">
+          <div class="alg-cat">
+            <div class="alg-hdr">💊 Drug Classes</div>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="penicillin"> Penicillins</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="cephalosporin"> Cephalosporins</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="nsaid"> NSAIDs</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="opioid"> Opioids</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="benzodiazepine"> Benzodiazepines</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="statin"> Statins</label>
+          </div>
+          <div class="alg-cat">
+            <div class="alg-hdr">🔬 Specific Drugs</div>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="aspirin"> Aspirin</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="ibuprofen"> Ibuprofen</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="morphine"> Morphine</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="codeine"> Codeine</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="amoxicillin"> Amoxicillin</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="warfarin"> Warfarin</label>
+          </div>
+          <div class="alg-cat">
+            <div class="alg-hdr">🌿 Non-Drug</div>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="latex"> Latex</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="iodine"> Iodine/Contrast</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="sulfite"> Sulfites</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="tartrazine"> Tartrazine</label>
+          </div>
+          <div class="alg-cat">
+            <div class="alg-hdr">🍎 Food Allergies</div>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="grapefruit"> Grapefruit</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="shellfish"> Shellfish</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="soy"> Soy</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="egg"> Egg</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="dairy"> Dairy/Lactose</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="banana"> Banana/Avocado/Kiwi</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="tyramine"> Tyramine-rich foods</label>
+            <label class="alg-chip"><input type="checkbox" class="alg" value="gluten"> Gluten</label>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-pri" style="margin-top:18px;width:100%;justify-content:center" onclick="analyze()">🔍 Analyze for Gender Bias</button>
+    </div>
+    <div>
+      <div class="card" id="risk-card" style="display:none"><h3>⚠️ Risk Assessment</h3><div class="risk-box"><div class="risk-num" id="r-num">—</div><div><h3 id="r-lbl" style="font-size:16px">Awaiting Analysis</h3><p id="r-desc" style="color:var(--muted);font-size:12px">Enter a prescription to begin</p></div></div></div>
+      <div class="spinner-wrap" id="loading"><div class="spinner"></div><p style="color:var(--muted);font-size:13px">Cross-referencing medical literature...</p></div>
+      <div id="results"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== HORMONAL ADJUSTER ===== -->
+<div id="p-horm" class="page">
+  <div class="pg-hdr"><div><h2>Hormonal Cycle Adjuster</h2><p>Dynamic dosage modification based on reproductive health status</p></div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div class="card">
+      <h3>🧬 Patient Status</h3>
+      <div class="form-grid">
+        <div class="fg full"><label>Drug Name</label><input id="h-drug" placeholder="e.g. Zolpidem"></div>
+        <div class="fg full"><label>Standard Dosage (mg)</label><input type="number" id="h-dose" placeholder="10"></div>
+        <div class="fg full"><label>Pregnancy</label>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label class="h-opt" onclick="setH(this,'preg','none')"><input type="radio" name="preg" checked><div><div class="hl">Not Pregnant</div></div></label>
+            <label class="h-opt" onclick="setH(this,'preg','1st')"><input type="radio" name="preg"><div><div class="hl">1st Trimester</div><div class="hd">Weeks 1-12 — highest risk</div></div></label>
+            <label class="h-opt" onclick="setH(this,'preg','2nd')"><input type="radio" name="preg"><div><div class="hl">2nd Trimester</div><div class="hd">Weeks 13-26</div></div></label>
+            <label class="h-opt" onclick="setH(this,'preg','3rd')"><input type="radio" name="preg"><div><div class="hl">3rd Trimester</div><div class="hd">Weeks 27-40</div></div></label>
+          </div>
+        </div>
+        <div class="fg full"><label>Lactation</label>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label class="h-opt" onclick="setH(this,'lac','no')"><input type="radio" name="lac" checked><div><div class="hl">Not Lactating</div></div></label>
+            <label class="h-opt" onclick="setH(this,'lac','yes')"><input type="radio" name="lac"><div><div class="hl">Currently Lactating</div><div class="hd">Drug transfers to breast milk</div></div></label>
+          </div>
+        </div>
+        <div class="fg full"><label>Menopausal Status</label>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label class="h-opt" onclick="setH(this,'men','pre')"><input type="radio" name="men" checked><div><div class="hl">Pre-Menopausal</div><div class="hd">Regular cycles</div></div></label>
+            <label class="h-opt" onclick="setH(this,'men','peri')"><input type="radio" name="men"><div><div class="hl">Peri-Menopausal</div><div class="hd">Irregular cycles</div></div></label>
+            <label class="h-opt" onclick="setH(this,'men','post')"><input type="radio" name="men"><div><div class="hl">Post-Menopausal</div><div class="hd">No cycles 12+ months</div></div></label>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-pri" style="margin-top:18px;width:100%;justify-content:center" onclick="calcHorm()">🧬 Calculate Adjustment</button>
+    </div>
+    <div>
+      <div class="card" id="horm-out" style="display:none"></div>
+      <div class="card" style="margin-top:16px">
+        <h3>📚 Why This Matters</h3>
+        <div style="font-size:12px;color:var(--muted);line-height:1.9">
+          <p><strong style="color:var(--txt)">Pregnancy:</strong> Blood volume increases 50%, altering drug distribution. Placenta transfers most drugs to fetus.</p>
+          <p><strong style="color:var(--txt)">Lactation:</strong> Lipophilic drugs accumulate in breast milk. Some suppress lactation or harm the infant.</p>
+          <p><strong style="color:var(--txt)">Menopause:</strong> Estrogen decline reduces CYP450 activity by 20-40%, changing drug metabolism rates.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DRUG DATABASE ===== -->
+<div id="p-db" class="page">
+  <div class="pg-hdr"><div><h2>Drug Bias Database</h2><p>20 drugs with documented gender-based efficacy and safety differences</p></div></div>
+  <div style="margin-bottom:18px"><input id="d-search" placeholder="🔍 Search by name, class, or bias type..." style="width:100%;padding:12px 18px;border:1.5px solid var(--bdr);border-radius:12px;font-size:13px;font-family:inherit" oninput="filterDb()"></div>
+  <div class="drg-grid" id="db-grid"></div>
+</div>
+
+<!-- ===== AUDIT LOG ===== -->
+<div id="p-log" class="page">
+  <div class="pg-hdr"><div><h2>Audit Log</h2><p>Complete history of all bias analyses</p></div><button class="btn btn-sec" onclick="exportCsv()">📥 Export CSV</button></div>
+  <div class="card">
+    <table class="a-tbl"><thead><tr><th>Time</th><th>Drug</th><th>Dose</th><th>Patient</th><th>Risk</th><th>Allergies</th><th>Flags</th></tr></thead>
+    <tbody id="log-tb"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:40px">No audits yet</td></tr></tbody></table>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<div class="toast" id="toast"></div>
+<div class="modal-bg" id="modal" onclick="closeModal()"><div class="modal" onclick="event.stopPropagation()"><button class="modal-x" onclick="closeModal()">&times;</button><div id="modal-body"></div></div></div>
+
+<script>
+// ===== DRUG DB =====
+var DB=[
+{n:"Zolpidem",c:"Hypnotic",bt:"Metabolic Rate",sd:10,fd:5,bs:9.5,d:"Women metabolize zolpidem 45% slower due to lower CYP3A4. FDA reduced female dose to 5mg in 2013.",ci:["FDA Drug Safety Communication (2013)"],ix:["Alcohol","CYP3A4 inhibitors"],bd:"45% lower CYP3A4 activity. 3x higher next-morning impairment in women.",alt:"Melatonin 2-5mg (gender-neutral), Trazodone 25-50mg (safer for women), Doxepin 3-6mg (lowest dose approved for insomnia)"},
+{n:"Warfarin",c:"Anticoagulant",bt:"Dose Response",sd:5,fd:3.5,bs:8.0,d:"Women need 30% lower dose due to lower CYP2C9 activity.",ci:["Holbrook et al., Chest, 2012"],ix:["NSAIDs","Vitamin K foods"],bd:"Therapeutic INR at 30% lower dose in women.",alt:"Apixaban 2.5mg (less bleeding risk in women), Rivaroxaban 15mg (fewer interactions)"},
+{n:"Codeine",c:"Opioid Analgesic",bt:"CYP2D6 Metabolism",sd:30,fd:30,bs:7.5,d:"Women more likely CYP2D6 ultra-rapid metabolizers, increasing overdose risk.",ci:["Crews et al., 2014","FDA Black Box (2013)"],ix:["CYP2D6 inhibitors","Benzodiazepines"],bd:"10-30% more common ultra-rapid metabolism in women.",alt:"Tramadol 25-50mg (lower ceiling effect), Acetaminophen 1000mg (gender-neutral), Ibuprofen 400mg (but watch GI risk in women)"},
+{n:"Aspirin",c:"NSAID/Antiplatelet",bt:"Sex-Specific Efficacy",sd:325,fd:325,bs:7.0,d:"Low-dose aspirin prevents stroke in women but heart attacks in men.",ci:["Ridker et al., NEJM, 2005"],ix:["Anticoagulants","Methotrexate"],bd:"Opposite benefits by sex — one-size-fits-all is biased.",alt:"Clopidogrel 75mg (alternative antiplatelet), for women: low-dose aspirin is effective for stroke prevention — use it wisely"},
+{n:"Digoxin",c:"Cardiac Glycoside",bt:"Renal Clearance",sd:0.25,fd:0.125,bs:8.5,d:"36% lower renal clearance in women. Toxicity risk significantly elevated.",ci:["DIG Trial, Lancet, 1997"],ix:["Amiodarone","Diuretics"],bd:"Toxic serum levels 36% more frequent in women.",alt:"Carvedilol 3.125mg (better tolerated in women), Sacubitril/Valsartan (heart failure, gender-neutral)"},
+{n:"Morphine",c:"Opioid Analgesic",bt:"Metabolite Accumulation",sd:15,fd:10,bs:7.0,d:"Women produce more excitatory metabolites (M3G). Higher respiratory depression risk.",ci:["Searle et al., 2003"],ix:["Benzodiazepines","MAO inhibitors"],bd:"Slower clearance, more excitatory metabolites in women.",alt:"Tramadol 25-50mg (lower respiratory risk), Acetaminophen 1000mg + Ibuprofen (non-opioid combo)"},
+{n:"Metformin",c:"Antidiabetic",bt:"Renal Clearance",sd:1000,fd:850,bs:6.0,d:"Women with PCOS respond differently. May need lower starting dose.",ci:["Lord et al., Cochrane, 2020"],ix:["Alcohol","Contrast dye"],bd:"40% better insulin sensitivity response in PCOS women."},
+{n:"Amoxicillin",c:"Antibiotic",bt:"Absorption Rate",sd:500,fd:500,bs:3.5,d:"Minor sex-based differences in absorption.",ci:["Mullertz et al., 2014"],ix:["Probenecid","Warfarin"],bd:"Low bias. Minor absorption differences."},
+{n:"Ibuprofen",c:"NSAID",bt:"GI Sensitivity",sd:400,fd:400,bs:6.5,d:"Women have 1.7x higher risk of NSAID-induced GI complications.",ci:["Warner et al., 2017"],ix:["Anticoagulants","ACE inhibitors"],bd:"1.7x higher GI risk in women."},
+{n:"Lisinopril",c:"ACE Inhibitor",bt:"Renal Sensitivity",sd:20,fd:10,bs:6.0,d:"Women more sensitive to hypotension. 50% lower dose for equivalent BP control.",ci:["Merchan et al., 2017"],ix:["Potassium","NSAIDs"],bd:"50% lower dose achieves target BP in women."},
+{n:"Diazepam",c:"Benzodiazepine",bt:"Distribution Volume",sd:10,fd:5,bs:7.0,d:"40% longer sedation in women due to higher body fat distribution.",ci:["Greenblatt et al., 2018"],ix:["Opioids","Alcohol"],bd:"40% longer half-life in women."},
+{n:"Simvastatin",c:"Statin",bt:"Myopathy Risk",sd:40,fd:20,bs:5.5,d:"1.5x higher risk of statin-induced myopathy in women.",ci:["Nicolas et al., 2019"],ix:["CYP3A4 inhibitors","Fibrates"],bd:"1.5x myopathy risk, 40% more muscle pain."},
+{n:"Omeprazole",c:"PPI",bt:"Metabolism Rate",sd:20,fd:20,bs:4.0,d:"Minor sex differences in CYP2C19 metabolism.",ci:["Shi & Klotz, 2011"],ix:["Clopidogrel","Methotrexate"],bd:"Low bias. Minor differences."},
+{n:"Levothyroxine",c:"Thyroid Hormone",bt:"Dose Requirements",sd:100,fd:88,bs:5.0,d:"Women need 88mcg vs 120mcg for men to achieve target TSH.",ci:["Jonklaas et al., 2014"],ix:["Calcium","Iron"],bd:"Women average 88mcg vs 120mcg for men."},
+{n:"Fluoxetine",c:"SSRI",bt:"CYP2D6 Metabolism",sd:20,fd:20,bs:5.5,d:"Women report 30% more sexual side effects at same doses.",ci:["Anderson, 2020"],ix:["MAO inhibitors","Triptans"],bd:"30% more sexual side effects in women."},
+{n:"Diphenhydramine",c:"Antihistamine",bt:"CNS Penetration",sd:25,fd:12.5,bs:6.5,d:"2x more sedation and cognitive impairment in women.",ci:["Ageloos et al., 2019"],ix:["CNS depressants"],bd:"2x more sedation. Dose should be 12.5mg for women."},
+{n:"Acetaminophen",c:"Analgesic",bt:"Metabolism",sd:1000,fd:1000,bs:3.0,d:"Minor sex differences. Sex-neutral dosing.",ci:["Bard et al., 2018"],ix:["Warfarin","Alcohol"],bd:"Low bias. Sex-neutral."},
+{n:"Metoprolol",c:"Beta-Blocker",bt:"CYP2D6 Metabolism",sd:50,fd:25,bs:6.0,d:"Bimodal metabolism. Women need 50% lower dose.",ci:["Rau et al., 2009"],ix:["CYP2D6 inhibitors"],bd:"50% lower dose for women."},
+{n:"Prednisone",c:"Corticosteroid",bt:"Bone Density",sd:20,fd:15,bs:5.5,d:"Women lose bone density 2x faster on corticosteroids.",ci:["van Staa et al., 2002"],ix:["NSAIDs","Warfarin"],bd:"2x faster bone loss in women."},
+{n:"Lamotrigine",c:"Anticonvulsant",bt:"Hormonal Interaction",sd:200,fd:150,bs:6.5,d:"OCPs reduce levels by 50%. Critical dose adjustment needed.",ci:["Sabers et al., 2003"],ix:["Oral contraceptives"],bd:"50% dose increase needed on OCPs."},
+{n:"Azithromycin",c:"Macrolide Antibiotic",bt:"QT Prolongation",sd:500,fd:500,bs:4.5,d:"Women have higher risk of drug-induced QT prolongation and cardiac arrhythmia.",ci:["Makrilakis et al., 2014"],ix:["QT-prolonging drugs","Warfarin"],bd:"Higher QT prolongation risk in women.","alt":"Amoxicillin 500mg or Doxycycline 100mg (no QT prolongation risk)"},
+{n:"Ciprofloxacin",c:"Fluoroquinolone",bt:"Tendon Risk",sd:500,fd:500,bs:5.0,d:"Women face higher risk of fluoroquinolone-associated tendon rupture, especially post-menopausal.",ci:["FDA Safety Communication, 2018"],ix:["NSAIDs","Corticosteroids"],bd:"Higher tendon rupture risk in women.","alt":"Nitrofurantoin 100mg for UTI (lower tendon risk in women)"},
+{n:"Ondansetron",c:"Antiemetic",bt:"Dose Response",sd:8,fd:4,bs:5.0,d:"Women clear ondansetron faster; lower dose may suffice for chemotherapy-induced nausea.",ci:["Salib et al., 2018"],ix:["QT-prolonging drugs"],bd:"Women clear 30% faster. Lower dose effective."},
+{n:"Prednisolone",c:"Corticosteroid",bt:"Bone Density",sd:20,fd:15,bs:5.5,d:"Women lose bone density 2x faster on corticosteroids. Osteoporosis risk elevated.",ci:["van Staa et al., 2002"],ix:["NSAIDs","Warfarin"],bd:"2x faster bone loss in women."},
+{n:"Clopidogrel",c:"Antiplatelet",bt:"CYP2C19 Metabolism",sd:75,fd:75,bs:5.0,d:"Women have lower CYP2C19 activity, reducing clopidogrel activation and efficacy.",ci:["Sorich et al., 2014"],ix:["PPIs","NSAIDs"],bd:"Lower activation in women. Reduced antiplatelet effect."},
+{n:"Alprazolam",c:"Benzodiazepine",bt:"Distribution Volume",sd:0.5,fd:0.25,bs:7.0,d:"Women have 48% higher AUC due to slower clearance. Prolonged sedation risk.",ci:["Greenblatt et al., 2011"],ix:["Opioids","Alcohol"],bd:"48% higher exposure in women."},
+{n:"Losartan",c:"ARB",bt:"Bioavailability",sd:50,fd:25,bs:5.5,d:"Women convert less losartan to active metabolite. May need dose adjustment.",ci:["Sica et al., 2005"],ix:["Potassium-sparing diuretics"],bd:"Lower conversion to active metabolite in women."},
+{n:"Escitalopram",c:"SSRI",bt:"Serotonin Sensitivity",sd:10,fd:5,bs:5.0,d:"Women have higher serotonin receptor density. Lower dose achieves same effect with fewer side effects.",ci:["Kornstein et al., 2000"],ix:["MAO inhibitors","Triptans"],bd:"Higher receptor density. Lower dose preferred."},
+{n:"Tamoxifen",c:"SERM",bt:"CYP2D6 Metabolism",sd:20,fd:20,bs:7.0,d:"CYP2D6 poor metabolizers (more common in some ethnicities) have 25% lower active metabolite.",ci:["Kelly et al., 2007"],ix:["CYP2D6 inhibitors","SSRIs"],bd:"CYP2D6 status critical for efficacy in breast cancer."},
+{n:"Pantoprazole",c:"PPI",bt:"Metabolism Rate",sd:40,fd:20,bs:4.0,d:"Women have slower CYP2C19 metabolism. Lower dose may be sufficient.",ci:["Blume et al., 2004"],ix:["Methotrexate","Clopidogrel"],bd:"Slower metabolism in women. Consider 20mg."},
+{n:"Gabapentin",c:"Anticonvulsant",bt:"Renal Clearance",sd:300,fd:300,bs:3.5,d:"Renally cleared. Women with lower eGFR may accumulate drug faster.",ci:["Luszczki et al., 2017"],ix:["Antacids","Opioids"],bd:"Low bias. Renal-dependent clearance."},
+{n:"Amlodipine",c:"CCB",bt:"Blood Pressure Response",sd:5,fd:2.5,bs:5.5,d:"Women show 2x greater blood pressure reduction per mg. Higher hypotension risk.",ci:["Turner et al., 2013"],ix:["Simvastatin"],bd:"Women respond at half the dose."},
+{n:"Tramadol",c:"Opioid Analgesic",bt:"CYP2D6 Metabolism",sd:50,fd:50,bs:6.5,d:"Women convert tramadol to active O-desmethyl metabolite faster. Higher seizure and serotonin risk.",ci:["Subedi et al., 2019"],ix:["SSRIs","MAO inhibitors"],bd:"Faster activation increases seizure risk in women."},
+{n:"Cetirizine",c:"Antihistamine",bt:"Sedation Risk",sd:10,fd:10,bs:4.0,d:"Minor difference. Women may experience slightly more drowsiness.",ci:["Simons et al., 1997"],ix:["CNS depressants"],bd:"Low bias. Minor sedation difference."},
+{n:"Furosemide",c:"Loop Diuretic",bt:"Bioavailability",sd:40,fd:20,bs:5.5,d:"Women have 80% higher bioavailability. Lower dose needed for equivalent diuresis.",ci:["Sica et al., 2003"],ix:["Lithium","Digoxin"],bd:"80% higher bioavailability in women."},
+{n:"Fluconazole",c:"Antifungal",bt:"CYP2C9 Metabolism",sd:200,fd:100,bs:6.0,d:"Women clear fluconazole 44% slower. Higher drug levels and prolonged exposure.",ci:["Nivoix et al., 2008"],ix:["Warfarin","QT-prolonging drugs"],bd:"44% slower clearance in women."},
+{n:"Ipratropium",c:"Anticholinergic",bt:"CNS Sensitivity",sd:500,fd:500,bs:3.0,d:"Minimal sex-based differences. Gender-neutral dosing.",ci:["Gross et al., 1989"],ix:["Other anticholinergics"],bd:"Low bias. Gender-neutral."},
+{n:"Methotrexate",c:"Immunosuppressant",bt:"Hepatic Clearance",sd:15,fd:10,bs:6.0,d:"Women have lower hepatic clearance. Higher toxicity risk at standard doses.",ci:["Bressolle et al., 1997"],ix:["NSAIDs","Penicillins"],bd:"Lower clearance, higher toxicity in women."},
+{n:"Levofloxacin",c:"Fluoroquinolone",bt:"QT Prolongation",sd:500,fd:500,bs:5.0,d:"Women at higher risk of QT prolongation with fluoroquinolones.",ci:["FDA Safety Communication, 2018"],ix:["QT-prolonging drugs","Corticosteroids"],bd:"Higher arrhythmia risk in women."}
+];
+
+// ===== CROSS-REACTIVITY =====
+var CR={
+penicillin:{dd:['amoxicillin','ampicillin'],cr:[{a:'cephalosporin',r:'high',n:'5-10% cross-reactivity'}],dc:'Beta-lactam',"alt":"Amoxicillin-Clavulanate (no QT or tendon risk in women)"},
+cephalosporin:{dd:['cephalexin','cefazolin'],cr:[{a:'penicillin',r:'high',n:'5-10% cross-reactivity'}],dc:'Beta-lactam'},
+nsaid:{dd:['ibuprofen','naproxen','diclofenac','meloxicam'],cr:[{a:'aspirin',r:'high',n:'NERD affects ~10% of asthmatics'}],dc:'NSAIDs'},
+aspirin:{dd:['aspirin','acetylsalicylic acid'],cr:[{a:'nsaid',r:'high',n:'NSAID cross-reactivity'}],dc:'Salicylates'},
+opioid:{dd:['morphine','codeine','oxycodone','fentanyl','tramadol'],cr:[],dc:'Opioids'},
+benzodiazepine:{dd:['diazepam','lorazepam','alprazolam','zolpidem'],cr:[],dc:'Benzodiazepines'},
+statin:{dd:['atorvastatin','simvastatin','rosuvastatin'],cr:[],dc:'Statins'},
+latex:{dd:[],cr:[{a:'banana',r:'low',n:'Latex-fruit syndrome'}],dc:'Latex'},
+ibuprofen:{dd:['ibuprofen'],cr:[{a:'nsaid',r:'high',n:'NSAID class member'}],dc:'NSAIDs'},
+codeine:{dd:['codeine'],cr:[{a:'opioid',r:'high',n:'Opioid class member'}],dc:'Opioids'},
+morphine:{dd:['morphine'],cr:[{a:'opioid',r:'high',n:'Opioid class member'}],dc:'Opioids'},
+amoxicillin:{dd:['amoxicillin'],cr:[{a:'penicillin',r:'high',n:'IS a penicillin'},{a:'cephalosporin',r:'high',n:'5-10% cross-reactivity'}],dc:'Penicillins'},
+warfarin:{dd:['warfarin'],cr:[],dc:'Anticoagulants'},
+zolpidem:{dd:['zolpidem'],cr:[],dc:'Z-drugs'},
+grapefruit:{dd:[],cr:[{a:'statin',r:'high',n:'Grapefruit blocks CYP3A4 → statin toxicity'},{a:'simvastatin',r:'high',n:'Grapefruit + simvastatin = rhabdomyolysis risk'}],dc:'CYP3A4 inhibitors'},
+shellfish:{dd:[],cr:[{a:'latex',r:'medium',n:'Shellfish allergy cross-reacts with chitin-based coatings'}],dc:'Chitin cross-reactivity'},
+soy:{dd:[],cr:[{a:'warfarin',r:'low',n:'Soy lecithin in tablets may trigger soy-allergic patients'}],dc:'Soy fillers'},
+egg:{dd:[],cr:[],dc:'Egg-based cultures'},
+dairy:{dd:[],cr:[{a:'warfarin',r:'low',n:'Lactose tablets contraindicated in severe dairy allergy'}],dc:'Lactose fillers'},
+banana:{dd:[],cr:[{a:'latex',r:'high',n:'Latex-fruit syndrome: banana/avocado/kiwi allergy = 50% cross-react with latex'}],dc:'Latex-fruit syndrome'},
+tyramine:{dd:[],cr:[{a:'fluoxetine',r:'high',n:'MAOI-type interaction: tyramine foods + MAO inhibitors = hypertensive crisis'},{a:'omeprazole',r:'low',n:'Minor interaction with tyramine metabolism'}],dc:'Tyramine crisis'},
+gluten:{dd:[],cr:[],dc:'Celiac disease'}
+};
+
+
+// ===== RISK FACTORS DATABASE =====
+var riskFactors = {
+  lowPotassium: { name: "Low Potassium (Hypokalemia)", icon: "⚗️", drugs: ["Azithromycin","Zolpidem","Escitalopram","Fluconazole","Ondansetron","Furosemide"], risk: "Combined with QT-prolonging drugs → fatal arrhythmia (Torsades de Pointes)" },
+  lowMagnesium: { name: "Low Magnesium (Hypomagnesemia)", icon: "🧪", drugs: ["Azithromycin","Digoxin","Ondansetron","Furosemide"], risk: "Worsens QT prolongation and heart rhythm instability" },
+  liverDisease: { name: "Liver Disease (Hepatic Impairment)", icon: "🫁", drugs: ["Codeine","Morphine","Tramadol","Warfarin","Simvastatin","Metformin","Amoxicillin-Clavulanate"], risk: "Drugs accumulate to toxic levels — liver can't metabolize them" },
+  kidneyDisease: { name: "Kidney Disease (Renal Impairment)", icon: "🫘", drugs: ["Digoxin","Metformin","Lithium","Gabapentin","Furosemide","Ciprofloxacin","Levofloxacin"], risk: "Drugs aren't cleared → overdose even at standard doses" },
+  heartCondition: { name: "Heart Disease / Heart Failure", icon: "❤️", drugs: ["Metformin","Amlodipine","Digoxin","Furosemide"], risk: "Some drugs worsen heart failure or cause fluid retention" },
+  elderly: { name: "Elderly (>65 years)", icon: "👴", drugs: ["ALL"], risk: "Slower metabolism, more side effects, higher fall risk with sedatives" },
+  obese: { name: "Obese (BMI > 30)", icon: "⚖️", drugs: ["ALL"], risk: "Dosing may need adjustment — some drugs distribute differently in fat tissue" },
+  prediabetic: { name: "Pre-Diabetes", icon: "🩸", drugs: ["NSAIDs","Corticosteroids","Prednisone","Prednisolone","Thiazide Diuretics","Furosemide"], risk: "Certain drugs can push pre-diabetes into full Type 2 Diabetes" },
+  diabetic: { name: "Diabetes (Type 1 or 2)", icon: "💉", drugs: ["NSAIDs","Corticosteroids","Prednisone","Prednisolone"], risk: "Can worsen blood sugar control" },
+  asthmatic: { name: "Asthma / COPD", icon: "🫁", drugs: ["NSAIDs","Aspirin","Ibuprofen","Metoprolol"], risk: "NSAIDs can trigger bronchospasm (aspirin-exacerbated respiratory disease)" },
+  pastHSP: { name: "History of HSP (Past or Present)", icon: "🔴", drugs: ["NSAIDs","Aspirin","Ibuprofen","Naproxen","Lisinopril","Enalapril","Ramipril","Penicillins","Trimethoprim-Sulfamethoxazole"], risk: "HSP causes permanent kidney scarring. Nephrotoxic drugs remain dangerous for LIFE even after recovery." },
+  purpura: { name: "Active Pediatric Purpura / HSP / Bleeding Disorder", icon: "🩹", drugs: ["NSAIDs","Aspirin","Ibuprofen","Naproxen","Warfarin","Clopidogrel","Heparin","Lisinopril","Enalapril","Ramipril","Trimethoprim-Sulfamethoxazole","Penicillins"], risk: "NSAIDs worsen HSP nephritis (kidney damage). ACE inhibitors dangerous if nephritis present. Use Acetaminophen instead of NSAIDs." }
+};
+
+var log=[],H={preg:'none',lac:'no',men:'pre'};
+
+
+// ===== CONDITION CHECK =====
+var viralConditions=['flu','cold','covid','bronchitis'];
+var abxIndications={Azithromycin:['pneumonia','sinusitis','pharyngitis','sti','skin','ear'],Ciprofloxacin:['uti','gi','skin','bone'],Levofloxacin:['pneumonia','uti','sinusitis','skin'],Amoxicillin:['pharyngitis','sinusitis','ear','dental','skin','bronchitis'],'Amoxicillin-Clavulanate':['sinusitis','otitis','pneumonia','skin','uti','dental'],Cephalexin:['skin','dental','bone','uti'],Metronidazole:['gi','dental','sti','bone'],Doxycycline:['sinusitis','pneumonia','sti','skin','eye','malaria'],Clindamycin:['skin','dental','bone','sti'],'Trimethoprim-Sulfamethoxazole':['uti','pneumonia','skin','gi'],Ceftriaxone:['pneumonia','uti','sti','meningitis','gi']};
+var abxAltW={Azithromycin:'Amoxicillin 500mg or Doxycycline 100mg (no QT prolongation risk)',Ciprofloxacin:'Nitrofurantoin 100mg for UTI (lower tendon risk in women)',Levofloxacin:'Amoxicillin-Clavulanate (no QT or tendon risk)',Amoxicillin:'Gender-neutral dosing. For penicillin allergy: Doxycycline.',Cephalexin:'Gender-neutral. Avoid if severe penicillin allergy.',Metronidazole:'Gender-neutral. Avoid alcohol during treatment.',Doxycycline:'Gender-neutral. Good respiratory infection alternative.',Clindamycin:'Higher C. difficile risk. Use only if other options fail.','Trimethoprim-Sulfamethoxazole':'For UTI: Nitrofurantoin preferred in women.',Ceftriaxone:'Gender-neutral. IV for severe infections.'};
+function checkCondition(dr,cond,sx){
+  var res=[];
+  if(!dr||!cond)return res;
+  var dn=dr.n;
+  var isAntibiotic=abxIndications[dn]!==undefined;
+  if(isAntibiotic){
+    var indicated=abxIndications[dn].indexOf(cond)!==-1;
+    var isViral=viralConditions.indexOf(cond)!==-1;
+    if(isViral&&!indicated){
+      res.push({s:'high',t:'Antibiotic Not Indicated for Viral Infection',m:dn+' is an antibiotic but '+cond+' is caused by a virus. Antibiotics have NO effect on viruses and contribute to resistance.',rc:'Consider antiviral (Oseltamivir for flu) or supportive care',ci:'WHO Antibiotic Resistance Guidelines'});
+      if(sx==='female'){
+        res.push({s:'medium',t:'Female Patient — Extra Risk from Unnecessary Antibiotic',m:'Women face higher risk of yeast infections and gut flora disruption from unnecessary antibiotics. Women are prescribed antibiotics for viral infections 30% more often than men.',rc:'Avoid unnecessary antibiotic. If bacterial superinfection suspected, use narrower-spectrum option'});
+      }
+    }
+    if(!isViral&&!indicated){
+      res.push({s:'medium',t:'Drug May Not Match Condition',m:dn+' is not first-line for '+cond+'. Consider a more targeted antibiotic.',rc:'Consult local antibiogram for optimal choice'});
+    }
+  }
+  return res;
+}
+
+// ===== RISK FACTOR CHECK =====
+function checkRiskFactors(dn,sx){
+  var out=[],dl=(dn||'').toLowerCase(),dr=findD(dn);
+  var sev={lowPotassium:'danger',lowMagnesium:'danger',liverDisease:'danger',kidneyDisease:'danger',asthmatic:'danger',pastHSP:'danger',purpura:'danger',heartCondition:'warning',elderly:'warning',obese:'warning',prediabetic:'warning',diabetic:'warning'};
+  var checked=Array.from(document.querySelectorAll('.risk-factor:checked')).map(function(c){return c.value});
+  checked.forEach(function(k){
+    var rf=riskFactors[k];if(!rf)return;
+    var cls=dr&&dr.c?dr.c.toLowerCase():'';
+    var hit=rf.drugs.indexOf('ALL')!==-1||rf.drugs.some(function(x){
+      var xl=x.toLowerCase();
+      return xl===dl||xl.indexOf(dl)!==-1||dl.indexOf(xl)!==-1||(cls&&(cls.indexOf(xl)!==-1||xl.indexOf(cls)!==-1));
+    });
+    if(!hit)return;
+    var s=sev[k]||'warning';
+    out.push({severity:s,icon:rf.icon,factor:rf.name,message:dn+' + '+rf.name+': '+rf.risk,recommendation:s==='danger'?'High-risk combination — choose a safer alternative or adjust dose under medical supervision':'Monitor closely — dose adjustment may be needed'});
+  });
+  return out;
+}
+
+// ===== NAV =====
+function go(id,el){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});
+  document.querySelectorAll('.sb-item').forEach(function(s){s.classList.remove('active')});
+  document.getElementById('p-'+id).classList.add('active');
+  if(el)el.classList.add('active');
+  if(id==='db')renderDb();
+  if(id==='log')renderLog();
+  if(id==='dash')renderDash();
+}
+
+// ===== ANALYZER =====
+function analyze(){
+  var dn=document.getElementById('i-drug').value.trim(),ds=parseFloat(document.getElementById('i-dose').value),sx=document.getElementById('i-sex').value,ag=parseInt(document.getElementById('i-age').value)||30,rl=document.getElementById('i-renal').value;
+  if(!dn||!ds){toast('Enter drug name and dosage');return}
+  document.getElementById('loading').classList.add('on');
+  document.getElementById('risk-card').style.display='none';
+  document.getElementById('results').innerHTML='';
+  setTimeout(function(){
+    document.getElementById('loading').classList.remove('on');
+    var dr=findD(dn),al=getAlg(),res=doAnalysis(dr,dn,ds,sx,ag,rl,al);
+    showResults(res);addLog(res);
+  },1200);
+}
+
+// Brand/generic name aliases — common Indian brands resolve to their generic DB entry
+var ALIAS={
+  'dolo':'Acetaminophen','doly':'Acetaminophen','dolo 650':'Acetaminophen','paracetamol':'Acetaminophen','crocin':'Acetaminophen','calpol':'Acetaminophen','pcm':'Acetaminophen','para':'Acetaminophen',
+  'disprin':'Aspirin','ecosprin':'Aspirin',
+  'azithral':'Azithromycin','azee':'Azithromycin','zithromax':'Azithromycin',
+  'brufen':'Ibuprofen','combiflam':'Ibuprofen',
+  'augmentin':'Amoxicillin','amoxyclav':'Amoxicillin','clavam':'Amoxicillin',
+  'cipro':'Ciprofloxacin','cifran':'Ciprofloxacin',
+  'glucophage':'Metformin','glycomet':'Metformin',
+  'lasix':'Furosemide','coumadin':'Warfarin','lanoxin':'Digoxin',
+  'omez':'Omeprazole','pantop':'Pantoprazole','pan-d':'Pantoprazole',
+  'amlong':'Amlodipine','cetzine':'Cetirizine','zyrtec':'Cetirizine','okacet':'Cetirizine',
+  'zolfresh':'Zolpidem','stilnoct':'Zolpidem',
+  'thyronorm':'Levothyroxine','euthyrox':'Levothyroxine','clopilet':'Clopidogrel',
+  'zocor':'Simvastatin','levaquin':'Levofloxacin'
+};
+function findD(n){
+  var l=(n||'').toLowerCase().trim();
+  if(ALIAS[l])l=ALIAS[l].toLowerCase();
+  var hit=DB.find(function(d){return d.n.toLowerCase()===l})||DB.find(function(d){return d.n.toLowerCase().indexOf(l)!==-1});
+  if(!hit&&/\d/.test(l)){
+    var l2=l.replace(/[\s\-]*\d+(\.\d+)?\s*(mg|g|mcg|ml)?$/,'').trim();
+    if(l2&&ALIAS[l2])l2=ALIAS[l2].toLowerCase();
+    if(l2&&l2!==l)hit=DB.find(function(d){return d.n.toLowerCase()===l2})||DB.find(function(d){return d.n.toLowerCase().indexOf(l2)!==-1});
+  }
+  return hit;
+}
+function getAlg(){return Array.from(document.querySelectorAll('.alg:checked')).map(function(c){return c.value})}
+
+function checkAlg(dn,al){
+  var out=[],dl=dn.toLowerCase();
+  al.forEach(function(a){
+    var c=CR[a];if(!c)return;
+    if(c.dd.indexOf(dl)!==-1)out.push({t:'direct',a:a,r:'critical',n:'Direct match: '+dn+' is '+c.dc});
+    c.cr.forEach(function(x){
+      var y=CR[x.a];if(y&&y.dd.indexOf(dl)!==-1)out.push({t:'cross',a:a,r:x.r,n:x.n});
+    });
+  });
+  return out;
+}
+
+function doAnalysis(dr,dn,ds,sx,ag,rl,al){
+  var res={dr:dr,dn:dn,ds:ds,sx:sx,ag:ag,rl:rl,al:al,rs:0,af:[],aa:[],ts:new Date()};
+  res.aa=checkAlg(dn,al);
+  res.aa.forEach(function(a){if(a.r==='critical')res.rs=10;else if(a.r==='high')res.rs=Math.max(res.rs,8);else if(a.r==='medium')res.rs=Math.max(res.rs,5)});
+  if(dr){
+    if(sx==='female'){
+      var pct=((ds/dr.fd-1)*100);
+      if(ds>dr.fd*1.2){res.af.push({s:'high',t:'Dosage Exceeds Female Guideline',m:ds+'mg is '+pct.toFixed(0)+'% above female dose ('+dr.fd+'mg)',rc:'Reduce to '+dr.fd+'mg',ci:dr.ci[0]});res.rs=Math.max(res.rs,Math.min(10,7+pct/50))}
+      else if(ds>dr.fd){res.af.push({s:'medium',t:'Above Female Optimal',m:'Above '+dr.fd+'mg recommendation',rc:'Consider '+dr.fd+'mg',ci:dr.ci[0]});res.rs=Math.max(res.rs,5)}
+      else{res.af.push({s:'low',t:'Within Female Range',m:'Dosage appropriate',rc:'No change needed',ci:dr.ci[0]});res.rs=Math.max(res.rs,1)}
+      if(dr.bs>=7){res.af.push({s:'high',t:'High Documented Bias',m:dr.bd,rc:'Monitor for sex-specific effects',ci:dr.ci[0]});res.rs=Math.max(res.rs,8)}
+    }else{
+      res.af.push({s:'low',t:'Male — Standard Protocol',m:'Standard dosing appropriate',rc:'No change needed',ci:dr.ci[0]});res.rs=Math.max(res.rs,1);
+    }
+    if(rl==='moderate'||rl==='severe'){res.af.push({s:'medium',t:'Renal Impairment',m:'Clearance may be reduced',rc:'Consider dose reduction',ci:'Clinical Guidelines'});res.rs=Math.max(res.rs,6)}
+  }else{
+    res.af.push({s:'info',t:'Drug Not in Database',m:dn+' not in our database',rc:'Manual review recommended',ci:'FDA Orange Book'});res.rs=Math.max(res.rs,2);
+  }
+  var riskAlerts=checkRiskFactors(dn,sx);
+
+  riskAlerts.forEach(function(a){res.af.push({s:a.severity==='danger'?'high':'medium',t:a.icon+' '+a.factor,m:a.message,rc:a.recommendation});if(a.severity==='danger')res.rs=Math.max(res.rs,9);else res.rs=Math.max(res.rs,6)});
+
+  var condCheck=checkCondition(dr,document.getElementById('i-condition').value,sx);
+  condCheck.forEach(function(c){res.af.push(c);if(c.s==='high')res.rs=Math.max(res.rs,9);else if(c.s==='medium')res.rs=Math.max(res.rs,6)});
+  return res;
+}
+
+function showResults(r){
+  document.getElementById('risk-card').style.display='block';
+  var ne=document.getElementById('r-num'),lb=document.getElementById('r-lbl'),ds=document.getElementById('r-desc');
+  ne.textContent=r.rs.toFixed(1);
+  if(r.rs>=7){ne.style.color='#dc2626';lb.textContent='HIGH BIAS RISK';lb.style.color='#dc2626';ds.textContent='Significant gender bias detected.'}
+  else if(r.rs>=4){ne.style.color='#d97706';lb.textContent='MODERATE RISK';lb.style.color='#d97706';ds.textContent='Some bias indicators present.'}
+  else{ne.style.color='#16a34a';lb.textContent='LOW RISK';lb.style.color='#16a34a';ds.textContent='Minimal bias detected.'}
+  var h='';
+  r.aa.forEach(function(a){
+    var cls=a.r==='critical'?'':'warn';
+    h+='<div class="bias-card '+cls+'"><h4>'+(a.t==='direct'?'🔴 DIRECT ALLERGY':'⚠️ CROSS-REACTIVITY')+'</h4><p><strong>'+a.n+'</strong></p>';
+    if(a.r==='critical')h+='<p style="color:#dc2626;font-weight:700;margin-top:6px">CONTRAINDICATED — DO NOT DISPENSE</p>';
+    h+='</div>';
+  });
+  r.af.forEach(function(a){
+    var cls=a.s==='high'?'':a.s==='medium'?'warn':'ok';
+    h+='<div class="bias-card '+cls+'"><h4>'+(a.s==='high'?'🔴':a.s==='medium'?'🟡':'🟢')+' '+a.t+'</h4><p>'+a.m+'</p><p style="margin-top:6px"><strong>Recommendation:</strong> '+a.rc+'</p>';
+    if(a.ci)h+='<div class="cite">📖 '+a.ci+'</div></div>';
+  });
+  if(r.dr){
+    h+='<div class="bias-card info"><h4>📊 Drug Profile</h4><p><strong>'+r.dr.c+'</strong> — Bias: '+r.dr.bt+'</p><p>Standard: <strong>'+r.dr.sd+'mg</strong> | Female: <strong>'+r.dr.fd+'mg</strong> | Score: <strong>'+r.dr.bs+'/10</strong></p><p style="margin-top:6px">'+r.dr.d+'</p>'+(r.dr.alt?'<div style="padding:14px;border-left:4px solid #16a34a;background:#f0fdf4;border-radius:0 10px 10px 0;margin-top:12px"><div style="font-size:12px;font-weight:700;color:#16a34a">✅ Safer Alternatives for Women</div><p style="font-size:13px;margin-top:6px;line-height:1.8">'+r.dr.alt+'</p></div>':'')+'</div>';
+  }
+  document.getElementById('results').innerHTML=h;
+}
+
+// ===== HORMONAL =====
+function setH(el,g,v){H[g]=v}
+function calcHorm(){
+  var dn=document.getElementById('h-drug').value.trim(),ds=parseFloat(document.getElementById('h-dose').value);
+  if(!dn||!ds){toast('Enter drug name and dosage');return}
+  var dr=findD(dn),out=document.getElementById('horm-out');
+  out.style.display='block';
+  var h='<h3>🧬 Hormonal Report</h3>',w=[],ad=ds;
+  if(H.preg!=='none'&&dr){
+    var cats={Metformin:'B',Warfarin:'X',Zolpidem:'C',Aspirin:'D',Ibuprofen:'C',Codeine:'C',Morphine:'C',Digoxin:'C',Lisinopril:'X',Simvastatin:'X',Omeprazole:'C',Levothyroxine:'A',Fluoxetine:'C',Amoxicillin:'B',Prednisone:'C',Metoprolol:'C',Diazepam:'D',Diphenhydramine:'B',Acetaminophen:'B',Azithromycin:'B',Ciprofloxacin:'C',Ondansetron:'B',Prednisolone:'C',Clopidogrel:'B',Alprazolam:'D',Losartan:'D',Escitalopram:'C',Tamoxifen:'D',Pantoprazole:'B',Gabapentin:'C',Amlodipine:'C',Tramadol:'C',Cetirizine:'B',Furosemide:'C',Fluconazole:'C',Methotrexate:'X',Levofloxacin:'C'};
+    var cat=cats[dr.n]||'Unknown';
+    if(cat==='X'){w.push({l:'crit',t:'Category X — CONTRAINDICATED in pregnancy'});ad=0}
+    else if(cat==='D'){w.push({l:'high',t:'Category D — Evidence of fetal risk'});ad=Math.round(ds*.5)}
+    else if(cat==='C'){w.push({l:'med',t:'Category C — Risk cannot be ruled out'});ad=Math.round(ds*.75)}
+    else if(cat==='B'){w.push({l:'low',t:'Category B — Generally safer in pregnancy'})}
+    if(H.preg==='1st')w.push({l:'crit',t:'First trimester: Highest teratogenic risk'});
+    else if(H.preg==='3rd')w.push({l:'med',t:'Third trimester: Neonatal withdrawal risk'});
+  }
+  if(H.lac==='yes'){w.push({l:'med',t:'Lactation: Drug transfers to breast milk'});ad=Math.round(ad*.8)}
+  if(H.men==='post'){w.push({l:'low',t:'Post-menopausal: CYP450 reduced 20-40%'});ad=Math.round(ad*.85)}
+  else if(H.men==='peri'){w.push({l:'low',t:'Peri-menopausal: Variable metabolism'})}
+  if(w.length===0){h+='<div class="adj-result"><h4>✅ No Adjustments Needed</h4><p>Standard dosing appropriate.</p></div>'}
+  else{
+    var cols={crit:'#dc2626',high:'#d97706',med:'#d97706',low:'#16a34a'},ico={crit:'🚫',high:'🔴',med:'🟡',low:'🟢'};
+    w.forEach(function(x){h+='<div style="padding:10px 14px;border-left:4px solid '+cols[x.l]+';margin:6px 0;background:#fff;border-radius:0 8px 8px 0;font-size:13px">'+ico[x.l]+' '+x.t+'</div>'});
+    if(ad!==ds){h+='<div class="adj-result"><h4>💊 Recommended: '+ad+'mg</h4><p>Standard: <strong>'+ds+'mg</strong> → Adjusted: <strong>'+ad+'mg</strong>';
+    if(ad<ds)h+=' (<strong style="color:#dc2626">'+((1-ad/ds)*100).toFixed(0)+'% reduction</strong>)';h+='</p>';
+    if(ad===0)h+='<p style="color:#dc2626;font-weight:700">DO NOT USE</p>';h+='</div>'}
+  }
+  out.innerHTML=h;
+}
+
+// ===== DRUG DB =====
+function renderDb(f){
+  var g=document.getElementById('db-grid');
+  var ds=f?DB.filter(function(d){return(d.n+d.c+d.bt).toLowerCase().indexOf(f.toLowerCase())!==-1}):DB;
+  g.innerHTML=ds.map(function(d){
+    var bc=d.bs>=7?'badge-h':d.bs>=5?'badge-m':'badge-l';
+    var bl=d.bs>=7?'High':d.bs>=5?'Moderate':'Low';
+    return '<div class="drg-card" onclick="showD(\''+d.n+'\')"><h4>'+d.n+'</h4><div class="cls">'+d.c+'</div><span class="badge '+bc+'" onclick="event.stopPropagation();showRisk(\''+d.n+'\')" style="cursor:pointer">'+bl+' ('+d.bs+'/10) \u2192 Details</span><div style="font-size:11px;color:var(--muted);margin-top:8px">♂ '+d.sd+'mg → ♀ '+d.fd+'mg</div></div>';
+  }).join('');
+}
+function filterDb(){renderDb(document.getElementById('d-search').value)}
+function showD(n){
+  var d=DB.find(function(x){return x.n===n});if(!d)return;
+  document.getElementById('modal-body').innerHTML='<h2 style="font-size:22px;font-weight:800;margin-bottom:4px">'+d.n+'</h2><p style="color:var(--muted);margin-bottom:18px">'+d.c+'</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px"><div style="padding:14px;background:var(--dng-lt);border-radius:12px"><div style="font-size:11px;color:var(--dng);font-weight:600">Standard (♂)</div><div style="font-size:26px;font-weight:800;color:var(--dng)">'+d.sd+'mg</div></div><div style="padding:14px;background:var(--suc-lt);border-radius:12px"><div style="font-size:11px;color:var(--suc);font-weight:600">Female (♀)</div><div style="font-size:26px;font-weight:800;color:var(--suc)">'+d.fd+'mg</div></div></div><p style="line-height:1.7;margin-bottom:14px;font-size:13px">'+d.d+'</p><h4 style="margin-bottom:6px;font-size:13px">Key Interactions</h4><div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px">'+d.ix.map(function(i){return '<span style="padding:3px 10px;background:var(--wrn-lt);border:1px solid #fbbf24;border-radius:20px;font-size:11px;color:#92400e">'+i+'</span>'}).join('')+'</div><h4 style="margin-bottom:6px;font-size:13px">📖 References</h4><div style="font-size:12px;color:var(--muted);line-height:2">'+d.ci.map(function(c){return '<div>• '+c+'</div>'}).join('')+'</div>'+(d.alt?'<div style="margin-top:14px;padding:14px;border-left:4px solid #16a34a;background:#f0fdf4;border-radius:0 10px 10px 0"><div style="font-size:12px;font-weight:700;color:#16a34a">✅ Safer Alternatives for Women</div><p style="font-size:13px;margin-top:6px;line-height:1.8;color:#333">'+d.alt+'</p></div>':'');
+  document.getElementById('modal').classList.add('show');
+}
+function closeModal(){document.getElementById('modal').classList.remove('show')}
+function showRisk(n){
+  var d=DB.find(function(x){return x.n===n});if(!d)return;
+  var riskLvl=d.bs>=7?'🔴 HIGH':d.bs>=4?'🟡 MODERATE':'🟢 LOW';
+  var riskCol=d.bs>=7?'#dc2626':d.bs>=4?'#d97706':'#16a34a';
+  var h='<h2 style="font-size:20px;font-weight:800;margin-bottom:2px">'+d.n+'</h2>';
+  h+='<p style="color:var(--muted);margin-bottom:16px">'+d.c+' — Bias: '+d.bt+'</p>';
+  h+='<div style="display:flex;gap:14px;margin-bottom:16px">';
+  h+='<div style="flex:1;padding:14px;background:var(--dng-lt);border-radius:12px;text-align:center"><div style="font-size:10px;color:var(--dng);font-weight:700">Standard (♂)</div><div style="font-size:24px;font-weight:800;color:var(--dng)">'+d.sd+'mg</div></div>';
+  h+='<div style="flex:1;padding:14px;background:var(--suc-lt);border-radius:12px;text-align:center"><div style="font-size:10px;color:var(--suc);font-weight:700">Female (♀)</div><div style="font-size:24px;font-weight:800;color:var(--suc)">'+d.fd+'mg</div></div>';
+  h+='<div style="flex:1;padding:14px;background:var(--wrn-lt);border-radius:12px;text-align:center"><div style="font-size:10px;color:#92400e;font-weight:700">Bias Score</div><div style="font-size:24px;font-weight:800;color:'+riskCol+'">'+d.bs+'/10</div></div>';
+  h+='</div>';
+  h+='<div style="padding:14px;border-left:4px solid '+riskCol+';background:#fff;border-radius:0 10px 10px 0;margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:'+riskCol+'">Risk Level: '+riskLvl+'</div><p style="font-size:13px;margin-top:6px;line-height:1.6">'+d.d+'</p></div>';
+  h+='<div style="padding:14px;border-left:4px solid #7c3aed;background:#faf5ff;border-radius:0 10px 10px 0;margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:#7c3aed">Key Bias Detail</div><p style="font-size:13px;margin-top:6px;line-height:1.6">'+d.bd+'</p></div>';
+  if(d.alt){h+='<div style="padding:14px;border-left:4px solid #16a34a;background:var(--suc-lt);border-radius:0 10px 10px 0;margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:#16a34a">✅ Safer Alternatives for Women</div><p style="font-size:13px;margin-top:6px;line-height:1.8">'+d.alt+'</p></div>'}
+  h+='<h4 style="margin-bottom:6px;font-size:12px;color:var(--muted)">⚠️ Key Interactions</h4><div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px">'+d.ix.map(function(i){return '<span style="padding:3px 10px;background:var(--wrn-lt);border:1px solid #fbbf24;border-radius:20px;font-size:11px;color:#92400e">'+i+'</span>'}).join('')+'</div>';
+  h+='<h4 style="margin-bottom:6px;font-size:12px;color:var(--muted)">📖 References</h4><div style="font-size:12px;color:var(--muted);line-height:2">'+d.ci.map(function(c){return '<div>• '+c+'</div>'}).join('')+'</div>';
+  document.getElementById('modal-body').innerHTML=h;
+  document.getElementById('modal').classList.add('show');
+}
+
+// ===== DASHBOARD =====
+function renderDash(){
+  document.getElementById('s-total').textContent=log.length;
+  document.getElementById('s-flag').textContent=log.filter(function(a){return a.rs>=5}).length;
+  document.getElementById('s-safe').textContent=log.filter(function(a){return a.rs<5}).length;
+  if(log.length>0){var avg=log.reduce(function(s,a){return s+a.rs},0)/log.length;document.getElementById('s-risk').textContent=avg.toFixed(1)}else{document.getElementById('s-risk').textContent='—'}
+  // Recent list
+  var rh='';log.slice(-5).reverse().forEach(function(a){
+    var rc=a.rs>=7?'r-h':a.rs>=4?'r-m':'r-l';
+    rh+='<div style="padding:10px 14px;border:1px solid var(--bdr);border-radius:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;font-size:13px"><div><strong>'+a.dn+'</strong> '+a.ds+'mg — '+a.sx+', '+a.ag+'y</div><span class="r-badge '+rc+'">'+a.rs.toFixed(1)+'</span></div>';
+  });
+  document.getElementById('recent-list').innerHTML=rh||'<p style="color:var(--muted);font-size:13px">No audits yet.</p>';
+  // Bar chart
+  renderChart();
+  renderPie();
+}
+
+function renderChart(){
+  var c=document.getElementById('chart-bars');
+  if(log.length===0){c.innerHTML='<p style="color:var(--muted);font-size:12px;width:100%;text-align:center;padding:30px">No data yet</p>';return}
+  var last=log.slice(-10);
+  var mx=Math.max.apply(null,last.map(function(a){return a.rs}));
+  c.innerHTML=last.map(function(a,i){
+    var h=Math.max(8,(a.rs/Math.max(mx,1))*100);
+    var col=a.rs>=7?'var(--dng)':a.rs>=4?'var(--wrn)':'var(--suc)';
+    return '<div class="bar-col"><div class="bar" style="height:'+h+'%;background:'+col+'"></div><div class="bar-lbl">'+(i+1)+'</div></div>';
+  }).join('');
+}
+
+function renderPie(){
+  var el=document.getElementById('pie-chart');
+  var hi=log.filter(function(a){return a.rs>=7}).length;
+  var md=log.filter(function(a){return a.rs>=4&&a.rs<7}).length;
+  var lo=log.filter(function(a){return a.rs<4}).length;
+  var tot=hi+md+lo;
+  if(tot===0){el.style.background='var(--bdr)';return}
+  var hp=(hi/tot)*100,mp=(md/tot)*100;
+  el.style.background='conic-gradient(var(--dng) 0% '+hp+'%, var(--wrn) '+hp+'% '+(hp+mp)+'%, var(--suc) '+(hp+mp)+'% 100%)';
+}
+
+// ===== AUDIT LOG =====
+function addLog(r){log.push(r);renderLog();renderDash()}
+function renderLog(){
+  var tb=document.getElementById('log-tb');
+  if(log.length===0){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:40px">No audits yet</td></tr>';return}
+  tb.innerHTML=log.map(function(a){
+    var rc=a.rs>=7?'r-h':a.rs>=4?'r-m':'r-l';
+    var rl=a.rs>=7?'High':a.rs>=4?'Medium':'Low';
+    return '<tr><td>'+a.ts.toLocaleTimeString()+'</td><td><strong>'+a.dn+'</strong></td><td>'+a.ds+'mg</td><td>'+a.sx+', '+a.ag+'y</td><td><span class="r-badge '+rc+'">'+rl+' ('+a.rs.toFixed(1)+')</span></td><td>'+(a.al.length?a.al.join(', '):'—')+'</td><td>'+a.aa.length+' allergy, '+a.af.length+' bias</td></tr>';
+  }).reverse().join('');
+}
+function exportCsv(){
+  if(!log.length){toast('No audits to export');return}
+  var c='Time,Drug,Dosage,Sex,Age,Risk,Allergies,Allergy Alerts,Bias Alerts\n';
+  log.forEach(function(a){c+='"'+a.ts.toISOString()+'","'+a.dn+'",'+a.ds+',"'+a.sx+'",'+a.ag+','+a.rs.toFixed(1)+',"'+a.al.join('; ')+'",'+a.aa.length+','+a.af.length+'\n'});
+  var b=new Blob([c],{type:'text/csv'}),u=URL.createObjectURL(b),l=document.createElement('a');l.href=u;l.download='genderrx-'+new Date().toISOString().split('T')[0]+'.csv';l.click();URL.revokeObjectURL(u);toast('Exported!');
+}
+
+function toast(m){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},3000)}
+
+document.querySelectorAll('.alg-chip').forEach(function(c){c.addEventListener('click',function(){this.classList.toggle('sel')})});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal()});
+</script>
+</body>
+</html>
