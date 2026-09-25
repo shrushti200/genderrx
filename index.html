@@ -627,7 +627,7 @@ function showResults(r){
     if(a.ci)h+='<div class="cite">📖 '+a.ci+'</div></div>';
   });
   if(r.dr){
-    h+='<div class="bias-card info"><h4>📊 Drug Profile</h4><p><strong>'+r.dr.c+'</strong> — Bias: '+r.dr.bt+'</p><p>Standard: <strong>'+r.dr.sd+'mg</strong> | Female: <strong>'+r.dr.fd+'mg</strong> | Score: <strong>'+r.dr.bs+'/10</strong></p><p style="margin-top:6px">'+r.dr.d+'</p>'+(r.dr.alt?'<div style="padding:14px;border-left:4px solid #16a34a;background:#f0fdf4;border-radius:0 10px 10px 0;margin-top:12px"><div style="font-size:12px;font-weight:700;color:#16a34a">✅ Safer Alternatives for Women</div><p style="font-size:13px;margin-top:6px;line-height:1.8">'+r.dr.alt+'</p></div>':'')+'</div>';
+    h+='<div class="bias-card info"><h4> Drug Profile</h4><p><strong>'+r.dr.c+'</strong> — Bias: '+r.dr.bt+'</p><p>Standard: <strong>'+r.dr.sd+'mg</strong> | Female: <strong>'+r.dr.fd+'mg</strong> | Score: <strong>'+r.dr.bs+'/10</strong></p><p style="margin-top:6px">'+r.dr.d+'</p>'+(r.dr.alt?'<div style="padding:14px;border-left:4px solid #16a34a;background:#f0fdf4;border-radius:0 10px 10px 0;margin-top:12px"><div style="font-size:12px;font-weight:700;color:#16a34a">✅ Safer Alternatives for Women</div><p style="font-size:13px;margin-top:6px;line-height:1.8">'+r.dr.alt+'</p></div>':'')+'</div>';
   }
   document.getElementById('results').innerHTML=h;
 }
@@ -657,7 +657,7 @@ function calcHorm(){
   else{
     var cols={crit:'#dc2626',high:'#d97706',med:'#d97706',low:'#16a34a'},ico={crit:'🚫',high:'🔴',med:'🟡',low:'🟢'};
     w.forEach(function(x){h+='<div style="padding:10px 14px;border-left:4px solid '+cols[x.l]+';margin:6px 0;background:#fff;border-radius:0 8px 8px 0;font-size:13px">'+ico[x.l]+' '+x.t+'</div>'});
-    if(ad!==ds){h+='<div class="adj-result"><h4>💊 Recommended: '+ad+'mg</h4><p>Standard: <strong>'+ds+'mg</strong> → Adjusted: <strong>'+ad+'mg</strong>';
+    if(ad!==ds){h+='<div class="adj-result"><h4> Recommended: '+ad+'mg</h4><p>Standard: <strong>'+ds+'mg</strong> → Adjusted: <strong>'+ad+'mg</strong>';
     if(ad<ds)h+=' (<strong style="color:#dc2626">'+((1-ad/ds)*100).toFixed(0)+'% reduction</strong>)';h+='</p>';
     if(ad===0)h+='<p style="color:#dc2626;font-weight:700">DO NOT USE</p>';h+='</div>'}
   }
@@ -695,8 +695,8 @@ function showRisk(n){
   h+='<div style="padding:14px;border-left:4px solid '+riskCol+';background:#fff;border-radius:0 10px 10px 0;margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:'+riskCol+'">Risk Level: '+riskLvl+'</div><p style="font-size:13px;margin-top:6px;line-height:1.6">'+d.d+'</p></div>';
   h+='<div style="padding:14px;border-left:4px solid #7c3aed;background:#faf5ff;border-radius:0 10px 10px 0;margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:#7c3aed">Key Bias Detail</div><p style="font-size:13px;margin-top:6px;line-height:1.6">'+d.bd+'</p></div>';
   if(d.alt){h+='<div style="padding:14px;border-left:4px solid #16a34a;background:var(--suc-lt);border-radius:0 10px 10px 0;margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:#16a34a">✅ Safer Alternatives for Women</div><p style="font-size:13px;margin-top:6px;line-height:1.8">'+d.alt+'</p></div>'}
-  h+='<h4 style="margin-bottom:6px;font-size:12px;color:var(--muted)">⚠️ Key Interactions</h4><div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px">'+d.ix.map(function(i){return '<span style="padding:3px 10px;background:var(--wrn-lt);border:1px solid #fbbf24;border-radius:20px;font-size:11px;color:#92400e">'+i+'</span>'}).join('')+'</div>';
-  h+='<h4 style="margin-bottom:6px;font-size:12px;color:var(--muted)">📖 References</h4><div style="font-size:12px;color:var(--muted);line-height:2">'+d.ci.map(function(c){return '<div>• '+c+'</div>'}).join('')+'</div>';
+  h+='<h4 style="margin-bottom:6px;font-size:12px;color:var(--muted)"> Key Interactions</h4><div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px">'+d.ix.map(function(i){return '<span style="padding:3px 10px;background:var(--wrn-lt);border:1px solid #fbbf24;border-radius:20px;font-size:11px;color:#92400e">'+i+'</span>'}).join('')+'</div>';
+  h+='<h4 style="margin-bottom:6px;font-size:12px;color:var(--muted)"> References</h4><div style="font-size:12px;color:var(--muted);line-height:2">'+d.ci.map(function(c){return '<div>• '+c+'</div>'}).join('')+'</div>';
   document.getElementById('modal-body').innerHTML=h;
   document.getElementById('modal').classList.add('show');
 }
